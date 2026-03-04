@@ -1,7 +1,9 @@
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { UserButton } from "@clerk/nextjs";
-export default function Home() {
+import { onBoardUser } from "@/modules/auth/actions";
+export default async function Home() {
+  await onBoardUser();
   return (
     <div className="flex flex-col items-center justify-center h-screen">
       <UserButton />

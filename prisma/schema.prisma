@@ -5,9 +5,19 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+enum UserRole {
+  USER
+  ADMIN
+}
 
 model User {
   id    Int    @id @default(autoincrement())
-  name  String
+  clerkId String @unique
   email String @unique
+  role UserRole @default(USER)
+  firstName String
+  lastName String
+  imageUrl String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
