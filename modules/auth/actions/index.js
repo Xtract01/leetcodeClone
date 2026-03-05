@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/db";
 import { currentUser } from "@clerk/nextjs/server";
+import { id } from "date-fns/locale";
 
 export const onBoardUser = async () => {
   try {
@@ -47,5 +48,23 @@ export const onBoardUser = async () => {
       success: false,
       message: "Error occurred while onboarding user",
     };
+  }
+};
+export const currentUserRole = async () => {
+  try {
+    const user = await currentUser();
+    if (!user) return null;
+
+    const { id } = user;
+
+    const dbUser = await db.user.findUnique({
+      where: { clerkId: id },
+      select: { role: true },
+    });
+
+    return dbUser?.role;
+  } catch (error) {
+    console.error(error);
+    return null;
   }
 };
