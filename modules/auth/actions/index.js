@@ -2,7 +2,6 @@
 
 import { db } from "@/lib/db";
 import { currentUser } from "@clerk/nextjs/server";
-import { id } from "date-fns/locale";
 
 export const onBoardUser = async () => {
   try {
@@ -14,7 +13,7 @@ export const onBoardUser = async () => {
 
     const { id, firstName, lastName, imageUrl, emailAddresses } = user;
 
-    const email = emailAddresses[0]?.emailAddress;
+    const email = emailAddresses?.[0]?.emailAddress;
 
     if (!email) {
       return { success: false, message: "Email not found" };
@@ -22,18 +21,13 @@ export const onBoardUser = async () => {
 
     const newUser = await db.user.upsert({
       where: { clerkId: id },
-      update: {
-        firstName,
-        lastName,
-        email: emailAddresses[0]?.emailAddress,
-        imageUrl,
-      },
+      update: {},
       create: {
         clerkId: id,
-        firstName,
-        lastName,
-        email: emailAddresses[0]?.emailAddress,
-        imageUrl,
+        email,
+        firstName: firstName ?? null,
+        lastName: lastName ?? null,
+        imageUrl: imageUrl ?? null,
       },
     });
 
@@ -43,26 +37,26 @@ export const onBoardUser = async () => {
       message: "User onboarded successfully",
     };
   } catch (error) {
-    console.error(error);
+    console.error("Onboard Error:", error);
+
     return {
       success: false,
       message: "Error occurred while onboarding user",
     };
   }
 };
+
 export const currentUserRole = async () => {
   try {
     const user = await currentUser();
     if (!user) return null;
 
-    const { id } = user;
-
     const dbUser = await db.user.findUnique({
-      where: { clerkId: id },
+      where: { clerkId: user.id },
       select: { role: true },
     });
 
-    return dbUser?.role;
+    return dbUser?.role ?? null;
   } catch (error) {
     console.error(error);
     return null;
