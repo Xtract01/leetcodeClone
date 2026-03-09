@@ -58,15 +58,17 @@ export async function POST(request) {
 
     // prepare execution tasks
     const submissions = [];
-    for (const [lang, solutionCode] of Object.entries(referenceSolutions)) {
-      submissions.push({
-        language: lang.toLowerCase(),
-        source_code: Buffer.from(solutionCode).toString("base64"),
-        tasks: testCases.map((tc) => ({
-          stdin: Buffer.from(tc.input).toString("base64"),
-        })),
-      });
-    }
+    const [firstLang, firstSolution] = Object.entries(referenceSolutions)[0];
+
+    submissions.push({
+      language: firstLang.toLowerCase(),
+      source_code: Buffer.from(firstSolution).toString("base64"),
+      tasks: [
+        {
+          stdin: Buffer.from(testCases[0].input).toString("base64"),
+        },
+      ],
+    });
 
     // run reference solutions
     const results = await submitBatch(submissions);

@@ -148,7 +148,7 @@ if __name__ == "__main__":
     print(result)`,
     JAVA: `import java.util.Scanner;
 
-class Main {
+public class Main {
     public int climbStairs(int n) {
         // Write your code here
         return 0;
@@ -201,7 +201,7 @@ n = int(sys.stdin.readline().strip())
 print(climbStairs(n))`,
     JAVA: `import java.util.Scanner;
 
-class Main {
+public class Main {
     public static int climbStairs(int n) {
         if (n <= 2) return n;
         int[] dp = new int[n + 1];
@@ -409,7 +409,7 @@ const CreateProblemForm = () => {
       codeSnippets: {
         JAVASCRIPT: "function solution() {\n  // Write your code here\n}",
         PYTHON: "def solution():\n    # Write your code here\n    pass",
-        JAVA: "public class Solution {\n    public static void main(String[] args) {\n        // Write your code here\n    }\n}",
+        JAVA: "public class Main {\n    public static void main(String[] args) {\n        // Write your code here\n    }\n}",
       },
       referenceSolutions: {
         JAVASCRIPT:
