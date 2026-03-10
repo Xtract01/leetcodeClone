@@ -4,26 +4,12 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  
 }
+
 enum UserRole {
-  USER
   ADMIN
-}
-
-model User {
-  id    String    @id @default(uuid())
-  clerkId String @unique
-  email String @unique
-  role UserRole @default(USER)
-  firstName String?
-  lastName String?
-  imageUrl String?
-
-  problems Problem[]
-  solvedProblems ProblemSolved[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  @@index([role])
+  USER
 }
 
 enum Difficulty {
@@ -31,39 +17,98 @@ enum Difficulty {
   MEDIUM
   HARD
 }
-model Problem {
-  id String @id @default(uuid())
-  title String
-  description String
-  difficulty Difficulty
-  tags String[]
-  userId String
-  examples Json
-  constraints String
-  hints String?
-  editorial String?
-  testCases Json
-  codeSnippets Json 
-  referenceSolutions Json
+
+model User {
+  id        String   @id @default(uuid())
+  clerkId   String   @unique
+  email     String   @unique
+  role      UserRole @default(USER)
+  firstName String?
+  lastName  String?
+  imageUrl  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id] , onDelete: Cascade)
-  solvedBy ProblemSolved[]
+  problems       Problem[]
+  solvedProblems ProblemSolved[]
+  submissions    Submission[]
+
+  @@index([role])
+}
+
+model Problem {
+  id                 String     @id @default(uuid())
+  title              String
+  description        String
+  difficulty         Difficulty
+  tags               String[]
+  userId             String
+  examples           Json
+  constraints        String
+  hints              String?
+  editorial          String?
+  testCases          Json
+  codeSnippets       Json
+  referenceSolutions Json
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submissions Submission[]
+  solvedBy    ProblemSolved[]
+
   @@index([difficulty])
 }
+
+model Submission {
+  id            String   @id @default(uuid())
+  userId        String
+  problemId     String
+  sourceCode    String
+  language      String
+  stdin         String?
+  stdout        String?
+  stderr        String?
+  compileOutput String?
+  status        String
+  memory        String?
+  time          String?
+  createdAt     DateTime @default(now())
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem   Problem          @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  testCases TestCaseResult[]
+
+  @@index([status])
+}
+
+model TestCaseResult {
+  id            String   @id @default(uuid())
+  submissionId  String
+  testCase      Int
+  passed        Boolean
+  stdout        String?
+  expected      String
+  stderr        String?
+  compileOutput String?
+  status        String
+  memory        String?
+  time          String?
+  createdAt     DateTime @default(now())
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+}
+
 model ProblemSolved {
   id        String   @id @default(uuid())
-  userId    String  
-  problemId String   
+  userId    String
+  problemId String
   createdAt DateTime @default(now())
-  
- 
+
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
 
-
-
-
-  @@unique([userId, problemId]) 
+  @@unique([userId, problemId])
 }
