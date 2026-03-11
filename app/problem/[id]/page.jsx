@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -24,16 +25,23 @@ import {
   Send,
   Code,
   FileText,
+  Lightbulb,
+  Trophy,
   ArrowLeft,
   Loader2,
-  CheckCircle2,
-  XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ModeToggle } from "@/components/ui/mode-toggle";
 import { toast } from "sonner";
 import Link from "next/link";
-import { executeCode, getProblemById } from "@/modules/problems/actions";
+import {
+  executeCode,
+  getAllSubmissionByCurrentUserForProblem,
+  getProblemById,
+} from "@/modules/problems/actions";
+import { SubmissionDetails } from "@/modules/problems/components/submission-details";
+import { TestCaseTable } from "@/modules/problems/components/test-case-table";
+import { SubmissionHistory } from "@/modules/problems/components/submission-history";
 
 const LANGUAGE_MAP = {
   JAVASCRIPT: "javascript",
@@ -59,7 +67,9 @@ const ProblemIdPage = ({ params }) => {
   const [selectedLanguage, setSelectedLanguage] = useState("JAVASCRIPT");
   const [code, setCode] = useState("");
   const [isRunning, setIsRunning] = useState(false);
-  const [testResults, setTestResults] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionHistory, setSubmissionHistory] = useState([]);
+  const [executionResponse, setExecutionResponse] = useState(null);
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -79,6 +89,21 @@ const ProblemIdPage = ({ params }) => {
   }, [params]);
 
   useEffect(() => {
+    const fetchSubmissionHistory = async () => {
+      try {
+        const resolvedParams = await params;
+        const result = await getAllSubmissionByCurrentUserForProblem(
+          resolvedParams.id,
+        );
+        if (result.success) setSubmissionHistory(result.data);
+      } catch (error) {
+        console.error("Error fetching submissions:", error);
+      }
+    };
+    fetchSubmissionHistory();
+  }, [params]);
+
+  useEffect(() => {
     if (problem?.codeSnippets[selectedLanguage]) {
       setCode(problem.codeSnippets[selectedLanguage]);
     }
@@ -87,7 +112,7 @@ const ProblemIdPage = ({ params }) => {
   const handleRun = async () => {
     try {
       setIsRunning(true);
-      setTestResults(null);
+      setExecutionResponse(null);
 
       const language = LANGUAGE_MAP[selectedLanguage];
       const stdin = problem.testCases.map((tc) => tc.input);
@@ -101,9 +126,10 @@ const ProblemIdPage = ({ params }) => {
         problem.id,
       );
 
+      setExecutionResponse(res);
+
       if (res.success) {
-        setTestResults(res.submission.testCases);
-        const allPassed = res.submission.testCases.every((tc) => tc.passed);
+        const allPassed = res.submission?.testCases?.every((tc) => tc.passed);
         allPassed
           ? toast.success("All test cases passed!")
           : toast.error("Some test cases failed.");
@@ -115,6 +141,48 @@ const ProblemIdPage = ({ params }) => {
       toast.error(error.message || "Execution failed");
     } finally {
       setIsRunning(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      setIsSubmitting(true);
+      setExecutionResponse(null);
+
+      const language = LANGUAGE_MAP[selectedLanguage];
+      const stdin = problem.testCases.map((tc) => tc.input);
+      const expected_outputs = problem.testCases.map((tc) => tc.output);
+
+      const res = await executeCode(
+        code,
+        language,
+        stdin,
+        expected_outputs,
+        problem.id,
+      );
+
+      setExecutionResponse(res);
+
+      if (res.success) {
+        const allPassed = res.submission?.testCases?.every((tc) => tc.passed);
+        if (allPassed) {
+          toast.success("Accepted! All test cases passed.");
+          const resolvedParams = await params;
+          const history = await getAllSubmissionByCurrentUserForProblem(
+            resolvedParams.id,
+          );
+          if (history.success) setSubmissionHistory(history.data);
+        } else {
+          toast.error("Wrong Answer. Some test cases failed.");
+        }
+      } else {
+        toast.error(res.error || "Submission failed");
+      }
+    } catch (error) {
+      console.error("Error submitting:", error);
+      toast.error(error.message || "Submission failed");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -160,7 +228,7 @@ const ProblemIdPage = ({ params }) => {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6">
-          {/* Left — Problem Description */}
+          {/* Left — Problem + Tabs */}
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -174,7 +242,6 @@ const ProblemIdPage = ({ params }) => {
                   {problem.description}
                 </p>
 
-                {/* Example */}
                 {problem.examples[selectedLanguage] && (
                   <div>
                     <h3 className="font-semibold text-lg mb-3">Example:</h3>
@@ -207,7 +274,6 @@ const ProblemIdPage = ({ params }) => {
                   </div>
                 )}
 
-                {/* Constraints */}
                 <div>
                   <h3 className="font-semibold text-lg mb-3">Constraints:</h3>
                   <div className="bg-muted p-4 rounded-lg">
@@ -218,9 +284,53 @@ const ProblemIdPage = ({ params }) => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Tabs */}
+            <Card>
+              <CardContent className="p-3">
+                <Tabs defaultValue="submissions" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger
+                      value="submissions"
+                      className="flex items-center gap-2"
+                    >
+                      <Trophy className="h-4 w-4" />
+                      Submissions
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="editorial"
+                      className="flex items-center gap-2"
+                    >
+                      <FileText className="h-4 w-4" />
+                      Editorial
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="hints"
+                      className="flex items-center gap-2"
+                    >
+                      <Lightbulb className="h-4 w-4" />
+                      Hints
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="submissions" className="p-2">
+                    <SubmissionHistory submissions={submissionHistory} />
+                  </TabsContent>
+                  <TabsContent value="editorial" className="p-6">
+                    <div className="text-center py-8 text-muted-foreground">
+                      {problem.editorial ?? "Editorial not available yet."}
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="hints" className="p-6">
+                    <div className="text-center py-8 text-muted-foreground">
+                      {problem.hints ?? "No hints available for this problem."}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Right — Editor + Test Cases */}
+          {/* Right — Editor + Test Cases + Results */}
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -266,7 +376,7 @@ const ProblemIdPage = ({ params }) => {
                 <div className="flex gap-3 mt-4">
                   <Button
                     onClick={handleRun}
-                    disabled={isRunning}
+                    disabled={isRunning || isSubmitting}
                     variant="outline"
                     className="flex items-center gap-2"
                   >
@@ -276,6 +386,18 @@ const ProblemIdPage = ({ params }) => {
                       <Play className="h-4 w-4" />
                     )}
                     {isRunning ? "Running..." : "Run"}
+                  </Button>
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={isSubmitting || isRunning}
+                    className="flex items-center gap-2"
+                  >
+                    {isSubmitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    {isSubmitting ? "Submitting..." : "Submit"}
                   </Button>
                 </div>
               </CardContent>
@@ -322,44 +444,14 @@ const ProblemIdPage = ({ params }) => {
               </CardContent>
             </Card>
 
-            {/* Test Results */}
-            {testResults && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Results</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {testResults.map((tc) => (
-                    <div
-                      key={tc.testCase}
-                      className={`flex items-center justify-between p-3 rounded-lg border ${
-                        tc.passed
-                          ? "bg-green-50 border-green-200 dark:bg-green-950/20"
-                          : "bg-red-50 border-red-200 dark:bg-red-950/20"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        {tc.passed ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-red-600" />
-                        )}
-                        <span className="text-sm font-medium">
-                          Test Case {tc.testCase}
-                        </span>
-                      </div>
-                      <div className="text-xs text-muted-foreground space-x-4">
-                        <span>
-                          Expected: <code>{tc.expected}</code>
-                        </span>
-                        <span>
-                          Got: <code>{tc.stdout ?? tc.stderr ?? "—"}</code>
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
+            {/* Execution Results */}
+            {executionResponse?.submission && (
+              <div className="space-y-4">
+                <SubmissionDetails submission={executionResponse.submission} />
+                <TestCaseTable
+                  testCases={executionResponse.submission.testCases}
+                />
+              </div>
             )}
           </div>
         </div>

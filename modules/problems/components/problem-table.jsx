@@ -2,8 +2,17 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
-import { PencilIcon, TrashIcon, Plus, Search, Filter } from "lucide-react";
-import { deleteProblem } from "../actions";
+import {
+  Bookmark,
+  PencilIcon,
+  TrashIcon,
+  Plus,
+  Search,
+  Filter,
+} from "lucide-react";
+import AddToPlaylistModal from "./add-to-playlist";
+import CreatePlaylistModal from "./create-playlist";
+import { deleteProblem } from "../actions"; // ✅ removed unused createPlaylist, addProblemToPlaylist
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -32,8 +41,10 @@ const ProblemsTable = ({ problems, user }) => {
   const [difficulty, setDifficulty] = useState("ALL");
   const [selectedTag, setSelectedTag] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
-
-  const difficulties = ["EASY", "MEDIUM", "HARD"];
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isAddToPlaylistModalOpen, setIsAddToPlaylistModalOpen] =
+    useState(false);
+  const [selectedProblemId, setSelectedProblemId] = useState(null);
 
   const allTags = useMemo(() => {
     if (!Array.isArray(problems)) return [];
@@ -41,6 +52,8 @@ const ProblemsTable = ({ problems, user }) => {
     problems.forEach((p) => p.tags?.forEach((t) => tagsSet.add(t)));
     return Array.from(tagsSet);
   }, [problems]);
+
+  const difficulties = ["EASY", "MEDIUM", "HARD"];
 
   const filteredProblems = useMemo(() => {
     return (problems || [])
@@ -74,6 +87,46 @@ const ProblemsTable = ({ problems, user }) => {
     }
   };
 
+  const handleCreatePlaylist = async (data) => {
+    try {
+      const response = await fetch("/api/playlists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: data.name,
+          description: data.description,
+        }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        toast.success("Playlist created successfully");
+        setTimeout(() => setIsCreateModalOpen(false), 100);
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      toast.error(error.message || "Failed to create playlist");
+    }
+  };
+  const handleAddToPlaylist = async (problemId, playlistId) => {
+    try {
+      const response = await fetch("/api/playlists/add-problem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ problemId, playlistId }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setIsAddToPlaylistModalOpen(false);
+        toast.success("Problem added to playlist");
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error("Error adding to playlist:", error);
+      toast.error(error.message || "Failed to add problem to playlist");
+    }
+  };
+
   const getDifficultyColor = (difficulty) => {
     switch (difficulty) {
       case "EASY":
@@ -97,14 +150,24 @@ const ProblemsTable = ({ problems, user }) => {
             Manage and solve coding problems
           </p>
         </div>
-        {user?.role === UserRole.ADMIN && (
-          <Link href="/create-problem">
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Create Problem
-            </Button>
-          </Link>
-        )}
+        <div className="flex gap-2">
+          {user?.role === UserRole.ADMIN && ( // ✅ was string "ADMIN"
+            <Link href="/create-problem">
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Create Problem
+              </Button>
+            </Link>
+          )}
+          <Button
+            onClick={() => setIsCreateModalOpen(true)}
+            variant="outline"
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Create Playlist
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -125,7 +188,7 @@ const ProblemsTable = ({ problems, user }) => {
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
-                    setCurrentPage(1);
+                    setCurrentPage(1); // ✅ reset page on filter change
                   }}
                   className="pl-10"
                 />
@@ -136,7 +199,7 @@ const ProblemsTable = ({ problems, user }) => {
                 value={difficulty}
                 onValueChange={(val) => {
                   setDifficulty(val);
-                  setCurrentPage(1);
+                  setCurrentPage(1); // ✅ reset page on filter change
                 }}
               >
                 <SelectTrigger className="w-[180px]">
@@ -157,7 +220,7 @@ const ProblemsTable = ({ problems, user }) => {
                 value={selectedTag}
                 onValueChange={(val) => {
                   setSelectedTag(val);
-                  setCurrentPage(1);
+                  setCurrentPage(1); // ✅ reset page on filter change
                 }}
               >
                 <SelectTrigger className="w-[180px]">
@@ -187,15 +250,13 @@ const ProblemsTable = ({ problems, user }) => {
                 <TableHead>Title</TableHead>
                 <TableHead>Tags</TableHead>
                 <TableHead className="w-[120px]">Difficulty</TableHead>
-                {user?.role === UserRole.ADMIN && (
-                  <TableHead className="w-[150px]">Actions</TableHead>
-                )}
+                <TableHead className="w-[200px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedProblems.length > 0 ? (
                 paginatedProblems.map((problem) => {
-                  const isSolved = problem.solvedBy?.length > 0;
+                  const isSolved = problem.solvedBy?.length > 0; // ✅ optional chaining
                   return (
                     <TableRow key={problem.id}>
                       <TableCell>
@@ -228,36 +289,48 @@ const ProblemsTable = ({ problems, user }) => {
                       </TableCell>
                       <TableCell>
                         <Badge
-                          className={`${getDifficultyColor(
-                            problem.difficulty,
-                          )} border-0 font-medium`}
+                          className={`${getDifficultyColor(problem.difficulty)} border-0 font-medium`}
                         >
                           {problem.difficulty}
                         </Badge>
                       </TableCell>
-                      {user?.role === UserRole.ADMIN && (
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleDelete(problem.id)}
-                            >
-                              <TrashIcon className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="sm" disabled>
-                              <PencilIcon className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      )}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {user?.role === UserRole.ADMIN && ( // ✅ was string "ADMIN"
+                            <>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDelete(problem.id)}
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </Button>
+                              <Button variant="outline" size="sm" disabled>
+                                <PencilIcon className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedProblemId(problem.id);
+                              setIsAddToPlaylistModalOpen(true);
+                            }}
+                            className="gap-2"
+                          >
+                            <Bookmark className="h-4 w-4" />
+                            <span className="hidden sm:inline">Save</span>
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   );
                 })
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={user?.role === UserRole.ADMIN ? 5 : 4}
+                    colSpan={5}
                     className="text-center py-8 text-muted-foreground"
                   >
                     <div className="flex flex-col items-center gap-2">
@@ -303,6 +376,19 @@ const ProblemsTable = ({ problems, user }) => {
           </div>
         </div>
       )}
+
+      {/* Modals */}
+      <CreatePlaylistModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreatePlaylist}
+      />
+      <AddToPlaylistModal
+        isOpen={isAddToPlaylistModalOpen}
+        onClose={() => setIsAddToPlaylistModalOpen(false)}
+        onSubmit={handleAddToPlaylist}
+        problemId={selectedProblemId}
+      />
     </div>
   );
 };
