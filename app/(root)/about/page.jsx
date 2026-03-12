@@ -88,10 +88,10 @@ const AboutPage = () => {
         <section className="text-center space-y-6">
           <div className="inline-flex items-center gap-2 text-xs font-mono tracking-widest text-amber-500 uppercase border border-amber-200 dark:border-amber-800 rounded-full px-4 py-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-            Open Source Project
+            Personal Project
           </div>
           <h1 className="text-5xl sm:text-6xl font-bold tracking-tight">
-            About <span className="text-amber-400">LeetCode</span>
+            About <span className="text-amber-400">LeetClone</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
             A full-stack coding practice platform built with modern web
