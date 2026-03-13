@@ -56,51 +56,49 @@ export async function POST(request) {
       );
     }
 
-    // prepare execution tasks
-    const submissions = [];
-    const [firstLang, firstSolution] = Object.entries(referenceSolutions)[0];
+    // Validate ALL languages against ALL test cases
+    for (const [lang, solution] of Object.entries(referenceSolutions)) {
+      const submission = {
+        language: lang.toLowerCase(),
+        source_code: Buffer.from(solution).toString("base64"),
+        tasks: testCases.map((tc) => ({
+          stdin: Buffer.from(tc.input).toString("base64"),
+        })),
+      };
 
-    submissions.push({
-      language: firstLang.toLowerCase(),
-      source_code: Buffer.from(firstSolution).toString("base64"),
-      tasks: [
-        {
-          stdin: Buffer.from(testCases[0].input).toString("base64"),
-        },
-      ],
-    });
+      // submitBatch returns array of arrays: results[submissionIndex][taskIndex]
+      const results = await submitBatch([submission]);
+      const taskResults = results[0]; // first (only) submission → array of task results
 
-    // run reference solutions
-    const results = await submitBatch(submissions);
-
-    if (!results || !Array.isArray(results)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid response from execution API" },
-        { status: 500 },
-      );
-    }
-
-    // validate outputs — results are flat: [lang0_task0, lang0_task1, lang1_task0, ...]
-    const numTestCases = testCases.length;
-    for (const [index, result] of results.entries()) {
-      const testCaseIndex = index % numTestCases;
-      const expected = testCases[testCaseIndex].output.trim();
-      const output = (result.output || "").trim(); // ✅ JDoodle returns "output", not "stdout"
-
-      console.log(
-        `Result ${index} — expected: "${expected}", received: "${output}"`,
-      );
-
-      if (output !== expected) {
+      if (!taskResults || !Array.isArray(taskResults)) {
         return NextResponse.json(
           {
             success: false,
-            message: "Reference solution failed test cases",
-            expected,
-            received: output,
+            message: `Invalid response from execution API for ${lang}`,
           },
-          { status: 400 },
+          { status: 500 },
         );
+      }
+
+      for (let i = 0; i < taskResults.length; i++) {
+        const expected = testCases[i].output.trim();
+        const output = (taskResults[i]?.output ?? "").trim();
+
+        console.log(
+          `[${lang}] Test ${i + 1} — expected: "${expected}", received: "${output}"`,
+        );
+
+        if (output !== expected) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `Reference solution failed for ${lang} on test case ${i + 1}`,
+              expected,
+              received: output,
+            },
+            { status: 400 },
+          );
+        }
       }
     }
 
@@ -127,7 +125,6 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error("Create Problem Error:", error);
-
     return NextResponse.json(
       { success: false, message: "Error occurred while processing request" },
       { status: 500 },

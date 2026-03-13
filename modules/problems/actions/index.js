@@ -99,6 +99,7 @@ export const executeCode = async (
   stdin,
   expected_outputs,
   problemId,
+  saveSubmission = true, // ✅ false for Run, true for Submit
 ) => {
   try {
     const user = await currentUser();
@@ -115,7 +116,6 @@ export const executeCode = async (
       return { success: false, error: "Invalid test cases" };
     }
 
-    // Build submission in codeExec format
     const submission = {
       language: language.toLowerCase(),
       source_code: Buffer.from(source_code).toString("base64"),
@@ -126,12 +126,24 @@ export const executeCode = async (
 
     const results = await submitBatch([submission]);
 
+    // ✅ submitBatch returns array of arrays: results[submissionIndex][taskIndex]
+    // We only have one submission, so extract results[0]
+    const taskResults = results[0];
+
+    if (!taskResults || !Array.isArray(taskResults)) {
+      return { success: false, error: "Invalid response from execution API" };
+    }
+
     let allPassed = true;
 
-    const detailedResults = results.map((result, i) => {
-      const stdout = result.output?.trim() ?? null; // JDoodle returns "output"
+    const detailedResults = taskResults.map((result, i) => {
+      const stdout = result.output?.trim() ?? null;
       const expected = expected_outputs[i]?.trim();
       const passed = stdout === expected;
+
+      console.log(
+        `[DEBUG] Test ${i + 1} | raw: ${JSON.stringify(result.output)} | trimmed: ${JSON.stringify(stdout)} | expected: ${JSON.stringify(expected)} | passed: ${passed}`,
+      );
 
       if (!passed) allPassed = false;
 
@@ -147,7 +159,18 @@ export const executeCode = async (
       };
     });
 
-    // Save submission
+    // ✅ For Run: skip saving to DB, return results directly
+    if (!saveSubmission) {
+      return {
+        success: true,
+        submission: {
+          status: allPassed ? "Accepted" : "Wrong Answer",
+          testCases: detailedResults,
+        },
+      };
+    }
+
+    // Save submission (only for Submit)
     const savedSubmission = await db.submission.create({
       data: {
         userId: dbUser.id,
@@ -159,7 +182,7 @@ export const executeCode = async (
         stderr: detailedResults.some((r) => r.stderr)
           ? JSON.stringify(detailedResults.map((r) => r.stderr))
           : null,
-        compileOutput: null, // JDoodle doesn't separate compile output
+        compileOutput: null,
         status: allPassed ? "Accepted" : "Wrong Answer",
         memory: detailedResults.some((r) => r.memory)
           ? JSON.stringify(detailedResults.map((r) => r.memory))
@@ -170,7 +193,6 @@ export const executeCode = async (
       },
     });
 
-    // Mark problem as solved if all passed
     if (allPassed) {
       await db.problemSolved.upsert({
         where: {
@@ -181,7 +203,6 @@ export const executeCode = async (
       });
     }
 
-    // Save per-test-case results
     const testCaseResults = detailedResults.map((result) => ({
       submissionId: savedSubmission.id,
       testCase: result.testCase,

@@ -43,10 +43,12 @@ import { SubmissionDetails } from "@/modules/problems/components/submission-deta
 import { TestCaseTable } from "@/modules/problems/components/test-case-table";
 import { SubmissionHistory } from "@/modules/problems/components/submission-history";
 
+// ✅ Added CPP
 const LANGUAGE_MAP = {
   JAVASCRIPT: "javascript",
   PYTHON: "python",
   JAVA: "java",
+  CPP: "cpp",
 };
 
 const getDifficultyColor = (difficulty) => {
@@ -70,6 +72,7 @@ const ProblemIdPage = ({ params }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionHistory, setSubmissionHistory] = useState([]);
   const [executionResponse, setExecutionResponse] = useState(null);
+  const [runMode, setRunMode] = useState(null); // "run" | "submit"
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -106,12 +109,16 @@ const ProblemIdPage = ({ params }) => {
   useEffect(() => {
     if (problem?.codeSnippets[selectedLanguage]) {
       setCode(problem.codeSnippets[selectedLanguage]);
+    } else if (problem) {
+      // ✅ fallback if CPP snippet not defined on older problems
+      setCode("// Write your C++ solution here");
     }
   }, [selectedLanguage, problem]);
 
   const handleRun = async () => {
     try {
       setIsRunning(true);
+      setRunMode("run");
       setExecutionResponse(null);
 
       const language = LANGUAGE_MAP[selectedLanguage];
@@ -147,6 +154,7 @@ const ProblemIdPage = ({ params }) => {
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
+      setRunMode("submit");
       setExecutionResponse(null);
 
       const language = LANGUAGE_MAP[selectedLanguage];
@@ -242,7 +250,9 @@ const ProblemIdPage = ({ params }) => {
                   {problem.description}
                 </p>
 
-                {problem.examples[selectedLanguage] && (
+                {/* ✅ fallback to JAVASCRIPT example if CPP not defined */}
+                {(problem.examples[selectedLanguage] ||
+                  problem.examples["JAVASCRIPT"]) && (
                   <div>
                     <h3 className="font-semibold text-lg mb-3">Example:</h3>
                     <div className="bg-muted p-4 rounded-lg space-y-2">
@@ -251,7 +261,12 @@ const ProblemIdPage = ({ params }) => {
                           Input:{" "}
                         </span>
                         <code className="text-sm bg-zinc-200 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-200 px-2 py-1 rounded">
-                          {problem.examples[selectedLanguage].input}
+                          {
+                            (
+                              problem.examples[selectedLanguage] ||
+                              problem.examples["JAVASCRIPT"]
+                            ).input
+                          }
                         </code>
                       </div>
                       <div>
@@ -259,14 +274,27 @@ const ProblemIdPage = ({ params }) => {
                           Output:{" "}
                         </span>
                         <code className="text-sm bg-zinc-200 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-200 px-2 py-1 rounded">
-                          {problem.examples[selectedLanguage].output}
+                          {
+                            (
+                              problem.examples[selectedLanguage] ||
+                              problem.examples["JAVASCRIPT"]
+                            ).output
+                          }
                         </code>
                       </div>
-                      {problem.examples[selectedLanguage].explanation && (
+                      {(
+                        problem.examples[selectedLanguage] ||
+                        problem.examples["JAVASCRIPT"]
+                      ).explanation && (
                         <div>
                           <span className="font-medium">Explanation: </span>
                           <span className="text-sm">
-                            {problem.examples[selectedLanguage].explanation}
+                            {
+                              (
+                                problem.examples[selectedLanguage] ||
+                                problem.examples["JAVASCRIPT"]
+                              ).explanation
+                            }
                           </span>
                         </div>
                       )}
@@ -343,13 +371,14 @@ const ProblemIdPage = ({ params }) => {
                     value={selectedLanguage}
                     onValueChange={setSelectedLanguage}
                   >
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-36">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="JAVASCRIPT">JavaScript</SelectItem>
                       <SelectItem value="PYTHON">Python</SelectItem>
                       <SelectItem value="JAVA">Java</SelectItem>
+                      <SelectItem value="CPP">C++</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -447,10 +476,27 @@ const ProblemIdPage = ({ params }) => {
             {/* Execution Results */}
             {executionResponse?.submission && (
               <div className="space-y-4">
-                <SubmissionDetails submission={executionResponse.submission} />
-                <TestCaseTable
-                  testCases={executionResponse.submission.testCases}
-                />
+                {runMode === "run" ? (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Run Results</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <TestCaseTable
+                        testCases={executionResponse.submission.testCases}
+                      />
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <>
+                    <SubmissionDetails
+                      submission={executionResponse.submission}
+                    />
+                    <TestCaseTable
+                      testCases={executionResponse.submission.testCases}
+                    />
+                  </>
+                )}
               </div>
             )}
           </div>

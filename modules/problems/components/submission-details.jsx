@@ -10,18 +10,29 @@ import { Clock, CpuIcon, Code, CheckCircle2, XCircle } from "lucide-react";
 
 export const SubmissionDetails = ({ submission }) => {
   const isSuccess = submission.status === "Accepted";
-  const averageMemory = submission.memory
-    ? JSON.parse(submission.memory).reduce(
-        (a, b) => parseFloat(a) + parseFloat(b),
-        0,
-      ) / JSON.parse(submission.memory).length
-    : 0;
 
-  const averageTime = submission.time
-    ? JSON.parse(submission.time)
-        .map((t) => parseFloat(t.replace(" s", "")))
-        .reduce((a, b) => a + b, 0) / JSON.parse(submission.time).length
-    : 0;
+  const averageMemory = (() => {
+    try {
+      const arr = JSON.parse(submission.memory ?? "[]").filter(Boolean);
+      if (!arr.length) return null;
+      return arr.reduce((a, b) => a + parseFloat(b), 0) / arr.length;
+    } catch {
+      return null;
+    }
+  })();
+
+  const averageTime = (() => {
+    try {
+      const arr = JSON.parse(submission.time ?? "[]").filter(Boolean);
+      if (!arr.length) return null;
+      return (
+        arr.reduce((a, b) => a + parseFloat(String(b).replace(" s", "")), 0) /
+        arr.length
+      );
+    } catch {
+      return null;
+    }
+  })();
 
   return (
     <Card className="w-full">
@@ -31,12 +42,12 @@ export const SubmissionDetails = ({ submission }) => {
           {isSuccess ? (
             <Badge className="bg-green-500/10 text-green-500 hover:bg-green-500/20">
               <CheckCircle2 className="mr-1 h-3 w-3" />
-              Success
+              Accepted
             </Badge>
           ) : (
             <Badge className="bg-red-500/10 text-red-500 hover:bg-red-500/20">
               <XCircle className="mr-1 h-3 w-3" />
-              Failed
+              Wrong Answer
             </Badge>
           )}
         </div>
@@ -60,7 +71,9 @@ export const SubmissionDetails = ({ submission }) => {
             <div>
               <p className="text-sm font-medium">Memory (avg)</p>
               <p className="text-sm text-muted-foreground">
-                {averageMemory.toFixed(2)} KB
+                {averageMemory != null
+                  ? `${averageMemory.toFixed(2)} KB`
+                  : "N/A"}
               </p>
             </div>
           </div>
@@ -69,7 +82,7 @@ export const SubmissionDetails = ({ submission }) => {
             <div>
               <p className="text-sm font-medium">Time (avg)</p>
               <p className="text-sm text-muted-foreground">
-                {averageTime.toFixed(3)} s
+                {averageTime != null ? `${averageTime.toFixed(3)} s` : "N/A"}
               </p>
             </div>
           </div>
